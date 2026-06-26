@@ -1,0 +1,13 @@
+# Dependencies
+node_modules/
+
+# WXT generated output and type scaffolding
+.output/
+.wxt/
+
+# Logs / OS noise
+*.log
+.DS_Store
+
+CLAUDE.md
+CLAUDE.local.md

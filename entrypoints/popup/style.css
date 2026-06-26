@@ -1,0 +1,71 @@
+/* The popup has no fixed size by default — it shrinks to its content. We set a
+   comfortable width so the slider has room. */
+:root {
+  color-scheme: light dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, sans-serif;
+}
+
+.popup {
+  width: 280px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.popup__header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.popup__title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.popup__readout {
+  font-size: 22px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.popup__slider {
+  width: 100%;
+}
+
+.popup__row {
+  display: flex;
+}
+
+.popup__btn {
+  flex: 1;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  border: 1px solid currentColor;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.popup__btn:hover {
+  background: rgba(127, 127, 127, 0.15);
+}
+
+.popup__status {
+  margin: 0;
+  min-height: 1em;
+  font-size: 12px;
+  opacity: 0.7;
+}

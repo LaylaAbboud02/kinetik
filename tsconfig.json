@@ -1,0 +1,6 @@
+{
+  // WXT generates a base tsconfig at .wxt/tsconfig.json with path aliases
+  // (e.g. `@/` -> project root) and the correct lib/types for extension code.
+  // We extend it rather than configuring TypeScript from scratch.
+  "extends": "./.wxt/tsconfig.json"
+}
