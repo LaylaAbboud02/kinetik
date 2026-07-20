@@ -23,3 +23,20 @@ export type Message =
 export interface GetSpeedResponse {
   speed: number;
 }
+
+// --- Per-site profiles (storage layer, build step 2) --------------------
+// A saved set of preferences for one domain. `skipSilence` and
+// `silenceThreshold` are used by Skip Silence (step 3); they live in the model
+// now so the stored shape doesn't have to change (and migrate) later.
+export interface SiteProfile {
+  speed: number;
+  skipSilence: boolean;
+  silenceThreshold: number; // 0.0–1.0
+}
+
+/** The values a brand-new profile starts from. */
+export const DEFAULT_PROFILE: SiteProfile = {
+  speed: 1.0,
+  skipSilence: false,
+  silenceThreshold: 0.02,
+};
