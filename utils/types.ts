@@ -20,7 +20,9 @@ export type Message =
   | { type: 'GET_SPEED' }
   | { type: 'TOGGLE_SKIP_SILENCE'; enabled: boolean; force?: boolean }
   | { type: 'SET_SILENCE_THRESHOLD'; threshold: number }
-  | { type: 'GET_SKIP_SILENCE_STATE' };
+  | { type: 'GET_SKIP_SILENCE_STATE' }
+  | { type: 'GET_LOOP_STATE' }
+  | { type: 'CLEAR_LOOP' };
 
 /** Reply to GET_SPEED so the popup can show the current speed when it opens. */
 export interface GetSpeedResponse {
@@ -62,4 +64,12 @@ export interface SkipSilenceState {
   contextSuspended: boolean;
   /** Live RMS amplitude (0–1), so the popup can show a level meter for tuning. */
   amplitude: number;
+}
+
+// --- A-B Loop (build step 4a) ------------------------------------------
+/** Loop state as sent to the popup. Mirrors ABLoop in utils/loop.ts. */
+export interface LoopState {
+  pointA: number | null;
+  pointB: number | null;
+  enabled: boolean;
 }

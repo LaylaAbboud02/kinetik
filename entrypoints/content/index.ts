@@ -7,11 +7,19 @@ import {
   MAX_SPEED,
   MIN_SPEED,
   type GetSpeedResponse,
+  type LoopState,
   type Message,
   type SkipSilenceState,
 } from '@/utils/types';
-import { flashSpeed, toggleOverlay } from './overlay';
+import { flashMessage, flashSpeed, toggleOverlay } from './overlay';
 import * as skipSilence from './skip-silence';
+import * as abLoop from './ab-loop';
+import {
+  advanceLoop,
+  formatTime,
+  EMPTY_LOOP,
+  type ABLoop,
+} from '@/utils/loop';
 
 // The content script runs in the context of the web page. It's the only part
 // of the extension that can touch the page's <video> element. The popup talks
@@ -75,6 +83,39 @@ export default defineContentScript({
       restore: restoreUserSpeed,
     };
 
+    // --- A-B Loop state (ephemeral, per CLAUDE.md §5) --------------------
+    let loop: ABLoop = EMPTY_LOOP;
+    let detachLoop: (() => void) | null = null;
+
+    /** Apply new loop state: render the badge and keep enforcement attached. */
+    function setLoop(next: ABLoop): void {
+      loop = next;
+      abLoop.renderBadge(loop);
+    }
+
+    /** One press of L: cycle set-A -> set-B/loop -> clear, with feedback. */
+    function cycleLoop(): void {
+      if (!video) return;
+      const { loop: next, outcome } = advanceLoop(loop, video.currentTime);
+      setLoop(next);
+      switch (outcome) {
+        case 'set-a':
+          flashMessage(`Loop start ${formatTime(next.pointA ?? 0)}`);
+          break;
+        case 'looping':
+          flashMessage(
+            `Looping ${formatTime(next.pointA ?? 0)} – ${formatTime(next.pointB ?? 0)}`,
+          );
+          break;
+        case 'cleared':
+          flashMessage('Loop cleared');
+          break;
+        case 'too-short':
+          flashMessage('Loop too short');
+          break;
+      }
+    }
+
     // --- Video detection (SPA- and shadow-DOM-safe) ---------------------
     // Two complications to handle:
     //   1. SPA sites (YouTube/Udemy) inject the <video> after this script
@@ -83,13 +124,55 @@ export default defineContentScript({
     //      a Web Component's SHADOW DOM. A normal document.querySelector and a
     //      normal MutationObserver cannot see into shadow roots, so we have to
     //      search through them explicitly.
+    // Tracks which media we last reset for, so we can tell a genuinely new
+    // video apart from ordinary events on the current one.
+    let lastSrc = '';
+    let detachSourceWatch: (() => void) | null = null;
+
+    /** Start fresh for new content: 1x speed (free tier) and no stale loop. */
+    function resetForNewMedia(): void {
+      userSpeed = DEFAULT_SPEED;
+      if (video) video.playbackRate = userSpeed;
+      setLoop(EMPTY_LOOP); // old timestamps refer to a different video
+    }
+
+    /**
+     * SPA sites (YouTube, Udemy) often REUSE the same <video> element and just
+     * swap its source when you navigate to another video. In that case
+     * bindVideo never runs again, so watching for element changes alone misses
+     * the new video entirely. We watch the element's source instead.
+     */
+    function watchSource(el: HTMLVideoElement): () => void {
+      const onSourceEvent = () => {
+        const src = el.currentSrc || el.src;
+        if (!src || src === lastSrc) return; // same media, ignore
+        lastSrc = src;
+        resetForNewMedia();
+      };
+      // These all fire when an element starts playing different content.
+      el.addEventListener('loadstart', onSourceEvent);
+      el.addEventListener('emptied', onSourceEvent);
+      el.addEventListener('loadedmetadata', onSourceEvent);
+      onSourceEvent(); // capture whatever is already loaded
+      return () => {
+        el.removeEventListener('loadstart', onSourceEvent);
+        el.removeEventListener('emptied', onSourceEvent);
+        el.removeEventListener('loadedmetadata', onSourceEvent);
+      };
+    }
+
     function bindVideo(el: HTMLVideoElement): void {
       if (video === el) return; // already bound to this exact element
+      // Detach listeners from the element we're leaving.
+      detachLoop?.();
+      detachSourceWatch?.();
+
       video = el;
-      // New video element = new content. Reset to 1x (free-tier behavior),
-      // rather than inheriting the previous video's speed.
-      userSpeed = DEFAULT_SPEED;
-      video.playbackRate = userSpeed;
+      lastSrc = '';
+      resetForNewMedia();
+
+      detachLoop = abLoop.attach(video, () => loop);
+      detachSourceWatch = watchSource(video);
     }
 
     // Recursively search the document AND any open shadow roots for the first
@@ -193,6 +276,9 @@ export default defineContentScript({
         case 'KeyV': // toggle the flash indicator
           toggleOverlay();
           break;
+        case 'KeyL': // cycle A-B loop
+          cycleLoop();
+          break;
         default:
           handled = false;
       }
@@ -250,6 +336,15 @@ export default defineContentScript({
             contextSuspended: skipSilence.isSuspended(),
             amplitude: skipSilence.readAmplitude(),
           } satisfies SkipSilenceState;
+        case 'GET_LOOP_STATE':
+          return {
+            pointA: loop.pointA,
+            pointB: loop.pointB,
+            enabled: loop.enabled,
+          } satisfies LoopState;
+        case 'CLEAR_LOOP':
+          setLoop(EMPTY_LOOP);
+          return;
       }
     });
   },

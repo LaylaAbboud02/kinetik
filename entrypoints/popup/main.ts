@@ -3,8 +3,10 @@ import {
   DEFAULT_SILENCE_THRESHOLD,
   DEFAULT_SPEED,
   type GetSpeedResponse,
+  type LoopState,
   type SkipSilenceState,
 } from '@/utils/types';
+import { formatTime } from '@/utils/loop';
 import './style.css';
 
 // The popup is a tiny web page that opens when you click the toolbar icon. It
@@ -28,6 +30,9 @@ const levelFill = document.querySelector<HTMLDivElement>('#level-fill')!;
 const levelMarker = document.querySelector<HTMLDivElement>('#level-marker')!;
 const levelReadout =
   document.querySelector<HTMLSpanElement>('#level-readout')!;
+const loopReadout = document.querySelector<HTMLSpanElement>('#loop-readout')!;
+const clearLoopBtn =
+  document.querySelector<HTMLButtonElement>('#clear-loop-btn')!;
 
 // The meter's full width represents this amplitude. It matches the sensitivity
 // slider's max so the threshold marker lines up with the slider position.
@@ -76,6 +81,34 @@ function reflect(speed: number): void {
 async function setSpeed(speed: number): Promise<void> {
   reflect(speed);
   await sendToActiveTab({ type: 'SET_SPEED', speed });
+}
+
+/**
+ * Coerce a loop reply into a usable shape. Same reasoning as the skip-silence
+ * normalizer: an older content script (version skew after an extension update)
+ * may not know about these fields, and must not be able to crash the popup.
+ */
+function normalizeLoopState(
+  raw: Partial<LoopState> | undefined,
+): LoopState | null {
+  if (!raw) return null;
+  return {
+    pointA: Number.isFinite(raw.pointA) ? (raw.pointA as number) : null,
+    pointB: Number.isFinite(raw.pointB) ? (raw.pointB as number) : null,
+    enabled: Boolean(raw.enabled),
+  };
+}
+
+/** Show the loop range, or a placeholder when nothing is looping. */
+function reflectLoop(state: LoopState): void {
+  const active =
+    state.enabled && state.pointA !== null && state.pointB !== null;
+  loopReadout.textContent = active
+    ? `${formatTime(state.pointA as number)} – ${formatTime(state.pointB as number)}`
+    : state.pointA !== null
+      ? `Start ${formatTime(state.pointA)} (press L again)`
+      : 'No loop set';
+  clearLoopBtn.disabled = !active && state.pointA === null;
 }
 
 /** Show the threshold number and move the meter's threshold marker. */
@@ -131,6 +164,11 @@ async function init(): Promise<void> {
     }),
   );
   if (skipState) reflectSkipSilence(skipState);
+
+  const loopState = normalizeLoopState(
+    await sendToActiveTab<Partial<LoopState>>({ type: 'GET_LOOP_STATE' }),
+  );
+  if (loopState) reflectLoop(loopState);
 }
 
 // 'input' fires continuously as the slider is dragged — instant feedback.
@@ -165,6 +203,11 @@ skipToggle.addEventListener('change', async () => {
     enabled: skipToggle.checked,
     force,
   });
+});
+
+clearLoopBtn.addEventListener('click', async () => {
+  await sendToActiveTab({ type: 'CLEAR_LOOP' });
+  reflectLoop({ pointA: null, pointB: null, enabled: false });
 });
 
 thresholdSlider.addEventListener('input', () => {

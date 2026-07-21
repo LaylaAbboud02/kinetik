@@ -46,20 +46,25 @@ function ensureBadge(): HTMLDivElement {
   return el;
 }
 
-/** Show the speed badge briefly, then fade it out (no-op if disabled). */
-export function flashSpeed(speed: number): void {
+/** Show any short message briefly, then fade it out (no-op if disabled). */
+export function flashMessage(text: string): void {
   if (!enabled) return;
   const el = ensureBadge();
   const parent = document.fullscreenElement ?? document.body;
   if (el.parentElement !== parent) parent.appendChild(el);
 
-  el.textContent = `${formatSpeed(speed)}×`; // × is the × symbol
+  el.textContent = text;
   el.style.opacity = '1';
 
   if (hideTimer) clearTimeout(hideTimer);
   hideTimer = window.setTimeout(() => {
     el.style.opacity = '0';
   }, 1500);
+}
+
+/** Show the current speed, e.g. "2.5×". */
+export function flashSpeed(speed: number): void {
+  flashMessage(`${formatSpeed(speed)}×`); // × is the multiplication sign
 }
 
 /** Toggle whether the flash indicator appears (bound to the V shortcut). */
