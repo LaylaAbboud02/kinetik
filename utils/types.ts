@@ -17,7 +17,10 @@ export const KEYBOARD_SPEED_STEP = 0.25;
 // notes, license checks). For step 1 we only need speed control.
 export type Message =
   | { type: 'SET_SPEED'; speed: number }
-  | { type: 'GET_SPEED' };
+  | { type: 'GET_SPEED' }
+  | { type: 'TOGGLE_SKIP_SILENCE'; enabled: boolean; force?: boolean }
+  | { type: 'SET_SILENCE_THRESHOLD'; threshold: number }
+  | { type: 'GET_SKIP_SILENCE_STATE' };
 
 /** Reply to GET_SPEED so the popup can show the current speed when it opens. */
 export interface GetSpeedResponse {
@@ -40,3 +43,23 @@ export const DEFAULT_PROFILE: SiteProfile = {
   skipSilence: false,
   silenceThreshold: 0.02,
 };
+
+// --- Skip Silence (build step 3) ---------------------------------------
+/** Amplitude at or below which audio counts as silence (0–1 scale). */
+export const DEFAULT_SILENCE_THRESHOLD = 0.02;
+/** How long silence must persist before we speed up (ms). */
+export const SILENCE_SUSTAIN_MS = 200;
+/** playbackRate used while skipping through silence. */
+export const SILENCE_SKIP_RATE = 8;
+
+/** What the popup needs to render the Skip Silence controls. */
+export interface SkipSilenceState {
+  enabled: boolean;
+  threshold: number;
+  /** false when the media is cross-origin (connecting would mute audio). */
+  supported: boolean;
+  /** true when the AudioContext could not start without a page interaction. */
+  contextSuspended: boolean;
+  /** Live RMS amplitude (0–1), so the popup can show a level meter for tuning. */
+  amplitude: number;
+}

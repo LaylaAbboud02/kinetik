@@ -1,14 +1,17 @@
 import { defineContentScript } from 'wxt/utils/define-content-script';
 import { browser } from 'wxt/browser';
 import {
+  DEFAULT_SILENCE_THRESHOLD,
   DEFAULT_SPEED,
   KEYBOARD_SPEED_STEP,
   MAX_SPEED,
   MIN_SPEED,
   type GetSpeedResponse,
   type Message,
+  type SkipSilenceState,
 } from '@/utils/types';
 import { flashSpeed, toggleOverlay } from './overlay';
+import * as skipSilence from './skip-silence';
 
 // The content script runs in the context of the web page. It's the only part
 // of the extension that can touch the page's <video> element. The popup talks
@@ -22,10 +25,15 @@ export default defineContentScript({
   matches: ['*://*/*'],
   main() {
     // --- In-memory state -------------------------------------------------
-    // currentSpeed lives only for this page load. Free tier intentionally does
+    // userSpeed lives only for this page load. Free tier intentionally does
     // NOT persist speed — every new page/video starts at 1x. Persistence is a
     // Pro feature (per-site profiles) handled in a later build step.
-    let currentSpeed = DEFAULT_SPEED;
+    //
+    // Two distinct notions of speed, deliberately kept apart:
+    //   - userSpeed: what the USER chose (slider/keyboard). Source of truth.
+    //   - the video's actual playbackRate: may be temporarily boosted by
+    //     Skip Silence, without disturbing userSpeed.
+    let userSpeed = DEFAULT_SPEED;
     let video: HTMLVideoElement | null = null;
 
     /** Clamp to the allowed range and round to avoid float drift. */
@@ -34,12 +42,38 @@ export default defineContentScript({
       return Number(bounded.toFixed(2));
     }
 
-    /** Apply a speed to the current video, update state, and flash the badge. */
-    function applySpeed(speed: number): void {
-      currentSpeed = clampSpeed(speed);
-      if (video) video.playbackRate = currentSpeed;
-      flashSpeed(currentSpeed);
+    /** User-initiated change: stores the speed, applies it, flashes the badge. */
+    function setUserSpeed(speed: number): void {
+      userSpeed = clampSpeed(speed);
+      if (video) video.playbackRate = userSpeed;
+      flashSpeed(userSpeed);
     }
+
+    /**
+     * Automatic rate change (Skip Silence). Sets playbackRate ONLY — it does
+     * not change userSpeed and does not flash the badge, which would otherwise
+     * strobe constantly as we dip in and out of silence.
+     */
+    function setEffectiveRate(rate: number): void {
+      if (video) video.playbackRate = rate;
+    }
+
+    /** Return the video to the user's chosen speed. */
+    function restoreUserSpeed(): void {
+      setEffectiveRate(userSpeed);
+    }
+
+    // --- Skip Silence state (ephemeral this step) ------------------------
+    // Not persisted: per-site persistence is a Pro behavior gated in step 5.
+    let skipSilenceEnabled = false;
+    let silenceThreshold = DEFAULT_SILENCE_THRESHOLD;
+
+    // How skip-silence reaches back into speed control. Passing these as hooks
+    // keeps the audio module ignorant of user-speed bookkeeping.
+    const skipSilenceHooks: skipSilence.SkipSilenceHooks = {
+      setRate: setEffectiveRate,
+      restore: restoreUserSpeed,
+    };
 
     // --- Video detection (SPA- and shadow-DOM-safe) ---------------------
     // Two complications to handle:
@@ -54,8 +88,8 @@ export default defineContentScript({
       video = el;
       // New video element = new content. Reset to 1x (free-tier behavior),
       // rather than inheriting the previous video's speed.
-      currentSpeed = DEFAULT_SPEED;
-      video.playbackRate = currentSpeed;
+      userSpeed = DEFAULT_SPEED;
+      video.playbackRate = userSpeed;
     }
 
     // Recursively search the document AND any open shadow roots for the first
@@ -142,13 +176,13 @@ export default defineContentScript({
       let handled = true;
       switch (e.code) {
         case 'KeyS': // decrease speed
-          applySpeed(currentSpeed - KEYBOARD_SPEED_STEP);
+          setUserSpeed(userSpeed - KEYBOARD_SPEED_STEP);
           break;
         case 'KeyD': // increase speed
-          applySpeed(currentSpeed + KEYBOARD_SPEED_STEP);
+          setUserSpeed(userSpeed + KEYBOARD_SPEED_STEP);
           break;
         case 'KeyR': // reset to 1x
-          applySpeed(DEFAULT_SPEED);
+          setUserSpeed(DEFAULT_SPEED);
           break;
         case 'KeyZ': // rewind 10s
           if (video) video.currentTime -= 10;
@@ -181,10 +215,41 @@ export default defineContentScript({
     browser.runtime.onMessage.addListener(async (message: Message) => {
       switch (message.type) {
         case 'SET_SPEED':
-          applySpeed(message.speed);
+          setUserSpeed(message.speed);
           return;
         case 'GET_SPEED':
-          return { speed: currentSpeed } satisfies GetSpeedResponse;
+          return { speed: userSpeed } satisfies GetSpeedResponse;
+        case 'TOGGLE_SKIP_SILENCE': {
+          if (!video) return;
+          if (!message.enabled) {
+            skipSilence.stop(skipSilenceHooks);
+            skipSilenceEnabled = false;
+            return;
+          }
+          // Cross-origin media would be muted irreversibly, so only proceed
+          // when it's safe or the user explicitly forced it.
+          const safety = skipSilence.checkSupport(video);
+          if (safety === 'cross-origin' && !message.force) return;
+          skipSilence.connect(video);
+          await skipSilence.resume();
+          skipSilence.start(silenceThreshold, skipSilenceHooks);
+          skipSilenceEnabled = true;
+          return;
+        }
+        case 'SET_SILENCE_THRESHOLD':
+          silenceThreshold = message.threshold;
+          skipSilence.setThreshold(message.threshold);
+          return;
+        case 'GET_SKIP_SILENCE_STATE':
+          return {
+            enabled: skipSilenceEnabled,
+            threshold: silenceThreshold,
+            supported: video
+              ? skipSilence.checkSupport(video) !== 'cross-origin'
+              : false,
+            contextSuspended: skipSilence.isSuspended(),
+            amplitude: skipSilence.readAmplitude(),
+          } satisfies SkipSilenceState;
       }
     });
   },

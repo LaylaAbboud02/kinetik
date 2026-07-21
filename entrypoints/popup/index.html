@@ -28,6 +28,43 @@
         <button id="reset-btn" class="popup__btn" type="button">Reset to 1×</button>
       </div>
 
+      <hr class="popup__divider" />
+
+      <div class="popup__row popup__row--between">
+        <label class="popup__label" for="skip-silence-toggle">Skip silence</label>
+        <input id="skip-silence-toggle" type="checkbox" />
+      </div>
+
+      <div class="popup__row popup__row--between">
+        <label class="popup__label popup__label--small" for="threshold-slider">
+          Sensitivity
+        </label>
+        <span id="threshold-readout" class="popup__mono">0.020</span>
+      </div>
+      <input
+        id="threshold-slider"
+        class="popup__slider"
+        type="range"
+        min="0.001"
+        max="0.1"
+        step="0.001"
+        value="0.02"
+        aria-label="Silence sensitivity"
+      />
+
+      <!-- Live audio level vs. the threshold, so the slider can be tuned by
+           eye: anything left of the marker counts as silence. -->
+      <div class="popup__meter" title="Live audio level">
+        <div id="level-fill" class="popup__meter-fill"></div>
+        <div id="level-marker" class="popup__meter-marker"></div>
+      </div>
+      <div class="popup__row popup__row--between">
+        <span class="popup__label--small">Level</span>
+        <span id="level-readout" class="popup__mono">—</span>
+      </div>
+
+      <p id="skip-silence-note" class="popup__status"></p>
+
       <p id="status" class="popup__status"></p>
     </main>
 
