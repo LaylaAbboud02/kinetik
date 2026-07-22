@@ -4,7 +4,9 @@ import {
   DEFAULT_SPEED,
   type GetSpeedResponse,
   type LoopState,
+  type NotesState,
   type SkipSilenceState,
+  type VideoNote,
 } from '@/utils/types';
 import { formatTime } from '@/utils/loop';
 import './style.css';
@@ -33,6 +35,7 @@ const levelReadout =
 const loopReadout = document.querySelector<HTMLSpanElement>('#loop-readout')!;
 const clearLoopBtn =
   document.querySelector<HTMLButtonElement>('#clear-loop-btn')!;
+const notesList = document.querySelector<HTMLUListElement>('#notes-list')!;
 
 // The meter's full width represents this amplitude. It matches the sensitivity
 // slider's max so the threshold marker lines up with the slider position.
@@ -111,6 +114,78 @@ function reflectLoop(state: LoopState): void {
   clearLoopBtn.disabled = !active && state.pointA === null;
 }
 
+/**
+ * Coerce a notes reply into a usable shape. Same reasoning as the other
+ * normalizers: an older content script must not be able to crash the popup.
+ */
+function normalizeNotesState(
+  raw: Partial<NotesState> | undefined,
+): NotesState | null {
+  if (!raw) return null;
+  return {
+    videoKey: typeof raw.videoKey === 'string' ? raw.videoKey : '',
+    notes: Array.isArray(raw.notes) ? (raw.notes as VideoNote[]) : [],
+  };
+}
+
+/** Rebuild the notes list. Clicking a note seeks; the × deletes it. */
+function reflectNotes(notes: VideoNote[]): void {
+  notesList.replaceChildren();
+
+  if (notes.length === 0) {
+    const empty = document.createElement('li');
+    empty.className = 'popup__notes-empty';
+    empty.textContent = 'No notes for this video.';
+    notesList.appendChild(empty);
+    return;
+  }
+
+  for (const note of notes) {
+    const item = document.createElement('li');
+    item.className = 'popup__note';
+
+    const jump = document.createElement('button');
+    jump.type = 'button';
+    jump.className = 'popup__note-jump';
+
+    const time = document.createElement('span');
+    time.className = 'popup__note-time';
+    time.textContent = formatTime(note.timestamp);
+
+    const text = document.createElement('span');
+    text.className = 'popup__note-text';
+    // textContent, never innerHTML: note text is user input and must not be
+    // able to inject markup into the popup.
+    text.textContent = note.text;
+
+    jump.append(time, text);
+    jump.addEventListener('click', () => {
+      void sendToActiveTab({ type: 'SEEK_TO', timestamp: note.timestamp });
+    });
+
+    const del = document.createElement('button');
+    del.type = 'button';
+    del.className = 'popup__note-delete';
+    del.textContent = '×';
+    del.title = 'Delete note';
+    del.addEventListener('click', async () => {
+      await sendToActiveTab({ type: 'DELETE_NOTE', id: note.id });
+      await refreshNotes();
+    });
+
+    item.append(jump, del);
+    notesList.appendChild(item);
+  }
+}
+
+/** Fetch the current video's notes and render them. */
+async function refreshNotes(): Promise<void> {
+  const state = normalizeNotesState(
+    await sendToActiveTab<Partial<NotesState>>({ type: 'GET_NOTES' }),
+  );
+  reflectNotes(state?.notes ?? []);
+}
+
 /** Show the threshold number and move the meter's threshold marker. */
 function reflectThreshold(threshold: number): void {
   thresholdReadout.textContent = threshold.toFixed(3);
@@ -169,6 +244,8 @@ async function init(): Promise<void> {
     await sendToActiveTab<Partial<LoopState>>({ type: 'GET_LOOP_STATE' }),
   );
   if (loopState) reflectLoop(loopState);
+
+  await refreshNotes();
 }
 
 // 'input' fires continuously as the slider is dragged — instant feedback.

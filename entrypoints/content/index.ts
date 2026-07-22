@@ -9,11 +9,15 @@ import {
   type GetSpeedResponse,
   type LoopState,
   type Message,
+  type NotesState,
   type SkipSilenceState,
 } from '@/utils/types';
 import { flashMessage, flashSpeed, toggleOverlay } from './overlay';
 import * as skipSilence from './skip-silence';
 import * as abLoop from './ab-loop';
+import { promptForNote } from './note-input';
+import { getVideoKey } from '@/utils/video-key';
+import { getNotes, addNote, deleteNote } from '@/utils/notes';
 import {
   advanceLoop,
   formatTime,
@@ -114,6 +118,33 @@ export default defineContentScript({
           flashMessage('Loop too short');
           break;
       }
+    }
+
+    /**
+     * One press of N: pause, collect a note, save it, resume.
+     * Playback resumes only if it was actually playing beforehand.
+     */
+    async function captureNote(): Promise<void> {
+      if (!video) return;
+      const timestamp = video.currentTime;
+      const wasPlaying = !video.paused;
+      if (wasPlaying) video.pause();
+
+      const text = await promptForNote();
+      if (text) {
+        // Surface storage failures instead of dropping them: this function is
+        // invoked with `void`, so an unhandled rejection would vanish and the
+        // note would silently fail to save.
+        try {
+          await addNote(getVideoKey(), timestamp, text);
+          flashMessage(`Note saved ${formatTime(timestamp)}`);
+        } catch (error) {
+          console.error('[Kinetik] failed to save note', error);
+          flashMessage("Couldn't save note");
+        }
+      }
+
+      if (wasPlaying) void video.play();
     }
 
     // --- Video detection (SPA- and shadow-DOM-safe) ---------------------
@@ -279,6 +310,9 @@ export default defineContentScript({
         case 'KeyL': // cycle A-B loop
           cycleLoop();
           break;
+        case 'KeyN': // add a timestamped note
+          void captureNote();
+          break;
         default:
           handled = false;
       }
@@ -344,6 +378,19 @@ export default defineContentScript({
           } satisfies LoopState;
         case 'CLEAR_LOOP':
           setLoop(EMPTY_LOOP);
+          return;
+        case 'GET_NOTES': {
+          const videoKey = getVideoKey();
+          return {
+            videoKey,
+            notes: await getNotes(videoKey),
+          } satisfies NotesState;
+        }
+        case 'DELETE_NOTE':
+          await deleteNote(getVideoKey(), message.id);
+          return;
+        case 'SEEK_TO':
+          if (video) video.currentTime = message.timestamp;
           return;
       }
     });

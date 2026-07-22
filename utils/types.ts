@@ -22,7 +22,10 @@ export type Message =
   | { type: 'SET_SILENCE_THRESHOLD'; threshold: number }
   | { type: 'GET_SKIP_SILENCE_STATE' }
   | { type: 'GET_LOOP_STATE' }
-  | { type: 'CLEAR_LOOP' };
+  | { type: 'CLEAR_LOOP' }
+  | { type: 'GET_NOTES' }
+  | { type: 'DELETE_NOTE'; id: string }
+  | { type: 'SEEK_TO'; timestamp: number };
 
 /** Reply to GET_SPEED so the popup can show the current speed when it opens. */
 export interface GetSpeedResponse {
@@ -72,4 +75,20 @@ export interface LoopState {
   pointA: number | null;
   pointB: number | null;
   enabled: boolean;
+}
+
+// --- Timestamped Notes (build step 4b) ---------------------------------
+/** A short note attached to a moment in a specific video. */
+export interface VideoNote {
+  id: string;
+  videoKey: string;
+  timestamp: number; // seconds into the video
+  text: string;
+  createdAt: number; // Date.now()
+}
+
+/** What the popup needs to render the notes list. */
+export interface NotesState {
+  videoKey: string;
+  notes: VideoNote[];
 }
