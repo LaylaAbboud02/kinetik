@@ -31,6 +31,21 @@
       <hr class="popup__divider" />
 
       <div class="popup__row popup__row--between">
+        <span class="popup__label">This site</span>
+        <span id="profile-readout" class="popup__mono">Not saved</span>
+      </div>
+      <div class="popup__row">
+        <button id="save-profile-btn" class="popup__btn" type="button">
+          Save for this site
+        </button>
+        <button id="remove-profile-btn" class="popup__btn" type="button" hidden>
+          Remove
+        </button>
+      </div>
+
+      <hr class="popup__divider" />
+
+      <div class="popup__row popup__row--between">
         <label class="popup__label" for="skip-silence-toggle">Skip silence</label>
         <input id="skip-silence-toggle" type="checkbox" />
       </div>
@@ -83,6 +98,10 @@
       <ul id="notes-list" class="popup__notes"></ul>
 
       <p id="status" class="popup__status"></p>
+
+      <button id="open-options-btn" class="popup__link" type="button">
+        Manage all profiles
+      </button>
     </main>
 
     <!-- type="module" lets us use import statements; WXT/Vite bundles this. -->

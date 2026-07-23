@@ -5,9 +5,11 @@ import {
   type GetSpeedResponse,
   type LoopState,
   type NotesState,
+  type SiteContext,
   type SkipSilenceState,
   type VideoNote,
 } from '@/utils/types';
+import { browser } from 'wxt/browser';
 import { formatTime } from '@/utils/loop';
 import './style.css';
 
@@ -36,6 +38,14 @@ const loopReadout = document.querySelector<HTMLSpanElement>('#loop-readout')!;
 const clearLoopBtn =
   document.querySelector<HTMLButtonElement>('#clear-loop-btn')!;
 const notesList = document.querySelector<HTMLUListElement>('#notes-list')!;
+const profileReadout =
+  document.querySelector<HTMLSpanElement>('#profile-readout')!;
+const saveProfileBtn =
+  document.querySelector<HTMLButtonElement>('#save-profile-btn')!;
+const removeProfileBtn =
+  document.querySelector<HTMLButtonElement>('#remove-profile-btn')!;
+const openOptionsBtn =
+  document.querySelector<HTMLButtonElement>('#open-options-btn')!;
 
 // The meter's full width represents this amplitude. It matches the sensitivity
 // slider's max so the threshold marker lines up with the slider position.
@@ -126,6 +136,30 @@ function normalizeNotesState(
     videoKey: typeof raw.videoKey === 'string' ? raw.videoKey : '',
     notes: Array.isArray(raw.notes) ? (raw.notes as VideoNote[]) : [],
   };
+}
+
+/** Show whether this site has a saved profile, and which buttons apply. */
+function reflectSiteContext(context: SiteContext | undefined): void {
+  const profile = context?.profile ?? null;
+  if (profile) {
+    profileReadout.textContent = `Saved: ${Number(profile.speed.toFixed(2))}×`;
+    saveProfileBtn.textContent = 'Update for this site';
+    removeProfileBtn.hidden = false;
+  } else {
+    profileReadout.textContent = context?.hostKey
+      ? `Not saved (${context.hostKey})`
+      : 'Not saved';
+    saveProfileBtn.textContent = 'Save for this site';
+    removeProfileBtn.hidden = true;
+  }
+}
+
+/** Fetch this site's profile state and render it. */
+async function refreshSiteContext(): Promise<void> {
+  const context = await sendToActiveTab<SiteContext>({
+    type: 'GET_SITE_CONTEXT',
+  });
+  reflectSiteContext(context);
 }
 
 /** Rebuild the notes list. Clicking a note seeks; the × deletes it. */
@@ -246,6 +280,7 @@ async function init(): Promise<void> {
   if (loopState) reflectLoop(loopState);
 
   await refreshNotes();
+  await refreshSiteContext();
 }
 
 // 'input' fires continuously as the slider is dragged — instant feedback.
@@ -280,6 +315,20 @@ skipToggle.addEventListener('change', async () => {
     enabled: skipToggle.checked,
     force,
   });
+});
+
+saveProfileBtn.addEventListener('click', async () => {
+  await sendToActiveTab({ type: 'SAVE_SITE_PROFILE' });
+  await refreshSiteContext();
+});
+
+removeProfileBtn.addEventListener('click', async () => {
+  await sendToActiveTab({ type: 'REMOVE_SITE_PROFILE' });
+  await refreshSiteContext();
+});
+
+openOptionsBtn.addEventListener('click', () => {
+  void browser.runtime.openOptionsPage();
 });
 
 clearLoopBtn.addEventListener('click', async () => {

@@ -10,6 +10,7 @@ import {
   type LoopState,
   type Message,
   type NotesState,
+  type SiteContext,
   type SkipSilenceState,
 } from '@/utils/types';
 import { flashMessage, flashSpeed, toggleOverlay } from './overlay';
@@ -18,6 +19,8 @@ import * as abLoop from './ab-loop';
 import { promptForNote } from './note-input';
 import { getVideoKey } from '@/utils/video-key';
 import { getNotes, addNote, deleteNote } from '@/utils/notes';
+import { getHostKey } from '@/utils/host-key';
+import { getProfile, saveProfile, deleteProfile } from '@/utils/storage';
 import {
   advanceLoop,
   formatTime,
@@ -48,6 +51,12 @@ export default defineContentScript({
     let userSpeed = DEFAULT_SPEED;
     let video: HTMLVideoElement | null = null;
 
+    // The rate we intend the video to be playing at right now — userSpeed
+    // normally, or the boosted rate while Skip Silence is skipping. Tracked
+    // separately so the rate guard below knows what to re-assert when a site's
+    // own player overwrites playbackRate.
+    let effectiveRate = DEFAULT_SPEED;
+
     /** Clamp to the allowed range and round to avoid float drift. */
     function clampSpeed(speed: number): number {
       const bounded = Math.min(MAX_SPEED, Math.max(MIN_SPEED, speed));
@@ -57,7 +66,7 @@ export default defineContentScript({
     /** User-initiated change: stores the speed, applies it, flashes the badge. */
     function setUserSpeed(speed: number): void {
       userSpeed = clampSpeed(speed);
-      if (video) video.playbackRate = userSpeed;
+      setEffectiveRate(userSpeed);
       flashSpeed(userSpeed);
     }
 
@@ -67,7 +76,24 @@ export default defineContentScript({
      * strobe constantly as we dip in and out of silence.
      */
     function setEffectiveRate(rate: number): void {
+      effectiveRate = rate;
       if (video) video.playbackRate = rate;
+    }
+
+    /**
+     * Sites like Udemy reset playbackRate to their own preferred speed when
+     * playback starts, wiping out whatever we applied. So we watch for rate
+     * changes we didn't make and re-assert ours.
+     *
+     * Ignores a rate of 0: players use it while stalling or buffering, and
+     * forcing a real speed there would fight the player's own state handling.
+     */
+    function guardRate(): void {
+      if (!video) return;
+      const actual = video.playbackRate;
+      if (actual === 0) return;
+      if (Math.abs(actual - effectiveRate) < 0.01) return;
+      video.playbackRate = effectiveRate;
     }
 
     /** Return the video to the user's chosen speed. */
@@ -159,12 +185,41 @@ export default defineContentScript({
     // video apart from ordinary events on the current one.
     let lastSrc = '';
     let detachSourceWatch: (() => void) | null = null;
+    let detachRateGuard: (() => void) | null = null;
 
-    /** Start fresh for new content: 1x speed (free tier) and no stale loop. */
+    // Guards against a stale profile lookup landing after newer media loaded.
+    // Incremented on every reset; the async apply checks it before touching
+    // playback.
+    let mediaToken = 0;
+
+    /**
+     * Start fresh for new content: clear the loop, then apply this site's
+     * saved speed (or 1x if there is no profile).
+     *
+     * Runs for EVERY new media source, not just page load, because SPA sites
+     * reuse the <video> element when navigating between videos.
+     */
     function resetForNewMedia(): void {
+      const token = ++mediaToken;
+      setLoop(EMPTY_LOOP); // old timestamps refer to a different video
+
+      // Reset immediately so there is never a window at the previous video's
+      // speed, then upgrade to the profile speed once storage answers.
       userSpeed = DEFAULT_SPEED;
       if (video) video.playbackRate = userSpeed;
-      setLoop(EMPTY_LOOP); // old timestamps refer to a different video
+
+      void getProfile(getHostKey())
+        .then((profile) => {
+          // Media changed again while we were reading storage — discard.
+          if (token !== mediaToken || !profile) return;
+          userSpeed = profile.speed;
+          // setEffectiveRate, not setUserSpeed: auto-apply must not flash the
+          // badge. The badge is feedback for user-initiated changes only.
+          setEffectiveRate(userSpeed);
+        })
+        .catch((error) => {
+          console.error('[Kinetik] failed to load site profile', error);
+        });
     }
 
     /**
@@ -197,6 +252,7 @@ export default defineContentScript({
       // Detach listeners from the element we're leaving.
       detachLoop?.();
       detachSourceWatch?.();
+      detachRateGuard?.();
 
       video = el;
       lastSrc = '';
@@ -204,6 +260,9 @@ export default defineContentScript({
 
       detachLoop = abLoop.attach(video, () => loop);
       detachSourceWatch = watchSource(video);
+
+      video.addEventListener('ratechange', guardRate);
+      detachRateGuard = () => el.removeEventListener('ratechange', guardRate);
     }
 
     // Recursively search the document AND any open shadow roots for the first
@@ -391,6 +450,25 @@ export default defineContentScript({
           return;
         case 'SEEK_TO':
           if (video) video.currentTime = message.timestamp;
+          return;
+        case 'GET_SITE_CONTEXT': {
+          const hostKey = getHostKey();
+          return {
+            hostKey,
+            profile: await getProfile(hostKey),
+          } satisfies SiteContext;
+        }
+        case 'SAVE_SITE_PROFILE':
+          // The content script owns the authoritative current settings, which
+          // is why it saves rather than the popup writing storage directly.
+          await saveProfile(getHostKey(), {
+            speed: userSpeed,
+            skipSilence: skipSilenceEnabled,
+            silenceThreshold: silenceThreshold,
+          });
+          return;
+        case 'REMOVE_SITE_PROFILE':
+          await deleteProfile(getHostKey());
           return;
       }
     });

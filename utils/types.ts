@@ -25,7 +25,10 @@ export type Message =
   | { type: 'CLEAR_LOOP' }
   | { type: 'GET_NOTES' }
   | { type: 'DELETE_NOTE'; id: string }
-  | { type: 'SEEK_TO'; timestamp: number };
+  | { type: 'SEEK_TO'; timestamp: number }
+  | { type: 'GET_SITE_CONTEXT' }
+  | { type: 'SAVE_SITE_PROFILE' }
+  | { type: 'REMOVE_SITE_PROFILE' };
 
 /** Reply to GET_SPEED so the popup can show the current speed when it opens. */
 export interface GetSpeedResponse {
@@ -91,4 +94,11 @@ export interface VideoNote {
 export interface NotesState {
   videoKey: string;
   notes: VideoNote[];
+}
+
+// --- Per-site profiles (build step 5a) ---------------------------------
+/** What the popup needs to render its "this site" section. */
+export interface SiteContext {
+  hostKey: string;
+  profile: SiteProfile | null;
 }
