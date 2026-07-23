@@ -213,8 +213,11 @@ export default defineContentScript({
 
       // Reset immediately so there is never a window at the previous video's
       // speed, then upgrade to the profile speed once storage answers.
+      // Route through setEffectiveRate so effectiveRate resets too — otherwise
+      // guardRate sees a stale effectiveRate and snaps the new video back to
+      // the previous video's speed.
       userSpeed = DEFAULT_SPEED;
-      if (video) video.playbackRate = userSpeed;
+      setEffectiveRate(DEFAULT_SPEED);
 
       void getProfile(getHostKey())
         .then((profile) => {
@@ -257,10 +260,14 @@ export default defineContentScript({
 
     function bindVideo(el: HTMLVideoElement): void {
       if (video === el) return; // already bound to this exact element
-      // Detach listeners from the element we're leaving.
+      // Detach everything tied to the element we're leaving. Skip silence's
+      // audio graph is bound to its original element and can't be moved, so we
+      // tear it down; the user re-enables it on the new video if they want it.
       detachLoop?.();
       detachSourceWatch?.();
       detachRateGuard?.();
+      skipSilence.teardown();
+      skipSilenceEnabled = false;
 
       video = el;
       lastSrc = '';
@@ -333,9 +340,7 @@ export default defineContentScript({
 
     // --- Keyboard shortcuts ---------------------------------------------
     // Defaults mirror Video Speed Controller so switchers keep their muscle
-    // memory. (Customization comes later via the options page.) L and N are
-    // Pro-gated features (A-B loop, notes) handled in a later build step — not
-    // bound yet.
+    // memory; they're customizable via the options page (see utils/shortcuts).
     // Start from the defaults so shortcuts work immediately, then swap in the
     // user's bindings once storage answers.
     let bindings: Bindings = DEFAULT_BINDINGS;

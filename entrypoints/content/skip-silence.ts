@@ -98,3 +98,25 @@ export function stop(hooks: SkipSilenceHooks): void {
 export function setThreshold(threshold: number): void {
   gate?.setThreshold(threshold);
 }
+
+/**
+ * Fully tear the audio graph down so a DIFFERENT video element can be connected
+ * later. `connect()` only ever runs once per AudioContext, and the context is
+ * bound to the element it was created for — so without this, once a site swaps
+ * in a new <video> element, skip silence would stay wired to the dead one.
+ *
+ * The MediaElementSource connection itself can't be undone, but closing the
+ * context releases it and lets a fresh one be built for the new element.
+ */
+export function teardown(): void {
+  if (loopTimer !== undefined) {
+    clearInterval(loopTimer);
+    loopTimer = undefined;
+  }
+  gate = null;
+  skipping = false;
+  if (audioContext) void audioContext.close();
+  audioContext = null;
+  analyser = null;
+  sampleBuffer = null;
+}
