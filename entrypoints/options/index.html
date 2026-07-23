@@ -33,6 +33,25 @@
           “Save for this site”.
         </p>
       </section>
+      <section class="section">
+        <div class="section__header">
+          <h2 class="section__title">Keyboard shortcuts</h2>
+          <button id="reset-shortcuts" class="delete-btn" type="button">
+            Reset to defaults
+          </button>
+        </div>
+        <table class="profiles">
+          <thead>
+            <tr>
+              <th>Action</th>
+              <th>Key</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="shortcuts-body"></tbody>
+        </table>
+        <p id="shortcut-message" class="empty"></p>
+      </section>
     </main>
 
     <script type="module" src="./main.ts"></script>

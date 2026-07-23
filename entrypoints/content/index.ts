@@ -22,6 +22,14 @@ import { getNotes, addNote, deleteNote } from '@/utils/notes';
 import { getHostKey } from '@/utils/host-key';
 import { getProfile, saveProfile, deleteProfile } from '@/utils/storage';
 import {
+  DEFAULT_BINDINGS,
+  resolveAction,
+  getBindings,
+  watchBindings,
+  type ActionId,
+  type Bindings,
+} from '@/utils/shortcuts';
+import {
   advanceLoop,
   formatTime,
   EMPTY_LOOP,
@@ -328,6 +336,42 @@ export default defineContentScript({
     // memory. (Customization comes later via the options page.) L and N are
     // Pro-gated features (A-B loop, notes) handled in a later build step — not
     // bound yet.
+    // Start from the defaults so shortcuts work immediately, then swap in the
+    // user's bindings once storage answers.
+    let bindings: Bindings = DEFAULT_BINDINGS;
+
+    void getBindings()
+      .then((loaded) => {
+        bindings = loaded;
+      })
+      .catch((error) => {
+        console.error('[Kinetik] failed to load shortcuts', error);
+      });
+
+    // Apply remaps live, so changing a key in the options tab takes effect in
+    // already-open video tabs without a reload.
+    watchBindings((next) => {
+      bindings = next;
+    });
+
+    /** What each action does. Keys come from `bindings`, not hardcoded. */
+    const actionHandlers: Record<ActionId, () => void> = {
+      speedDown: () => setUserSpeed(userSpeed - KEYBOARD_SPEED_STEP),
+      speedUp: () => setUserSpeed(userSpeed + KEYBOARD_SPEED_STEP),
+      reset: () => setUserSpeed(DEFAULT_SPEED),
+      rewind: () => {
+        if (video) video.currentTime -= 10;
+      },
+      advance: () => {
+        if (video) video.currentTime += 10;
+      },
+      toggleOverlay: () => {
+        toggleOverlay();
+      },
+      loop: () => cycleLoop(),
+      note: () => void captureNote(),
+    };
+
     function shouldIgnoreKey(e: KeyboardEvent): boolean {
       // Don't hijack keys the OS/browser owns (Cmd+R reload, Ctrl+S save, …).
       if (e.ctrlKey || e.metaKey || e.altKey) return true;
@@ -346,41 +390,16 @@ export default defineContentScript({
     function onKeyDown(e: KeyboardEvent): void {
       if (shouldIgnoreKey(e)) return;
       // e.code is the physical key ("KeyS"), independent of shift/caps lock.
-      let handled = true;
-      switch (e.code) {
-        case 'KeyS': // decrease speed
-          setUserSpeed(userSpeed - KEYBOARD_SPEED_STEP);
-          break;
-        case 'KeyD': // increase speed
-          setUserSpeed(userSpeed + KEYBOARD_SPEED_STEP);
-          break;
-        case 'KeyR': // reset to 1x
-          setUserSpeed(DEFAULT_SPEED);
-          break;
-        case 'KeyZ': // rewind 10s
-          if (video) video.currentTime -= 10;
-          break;
-        case 'KeyX': // advance 10s
-          if (video) video.currentTime += 10;
-          break;
-        case 'KeyV': // toggle the flash indicator
-          toggleOverlay();
-          break;
-        case 'KeyL': // cycle A-B loop
-          cycleLoop();
-          break;
-        case 'KeyN': // add a timestamped note
-          void captureNote();
-          break;
-        default:
-          handled = false;
-      }
-      // If we acted on the key, stop the page from also reacting to it
-      // (e.g. a site that uses "s" for its own shortcut).
-      if (handled) {
-        e.preventDefault();
-        e.stopPropagation();
-      }
+      const action = resolveAction(bindings, e.code);
+      // Unbound key: leave it entirely alone so the page can use it. This is
+      // what makes remapping a real fix for shortcut conflicts.
+      if (!action) return;
+
+      actionHandlers[action]();
+
+      // We acted on the key, so stop the page reacting to it too.
+      e.preventDefault();
+      e.stopPropagation();
     }
 
     // `capture: true` runs our handler before the page's own listeners, so our

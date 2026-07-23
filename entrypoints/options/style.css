@@ -81,3 +81,35 @@ body {
   opacity: 0.7;
   font-size: 14px;
 }
+
+.section {
+  margin-top: 40px;
+}
+
+.section__header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.section__title {
+  margin: 0;
+  font-size: 16px;
+}
+
+.key-cap {
+  display: inline-block;
+  min-width: 28px;
+  padding: 3px 8px;
+  border: 1px solid rgba(127, 127, 127, 0.5);
+  border-radius: 4px;
+  font-family: ui-monospace, monospace;
+  font-size: 13px;
+  text-align: center;
+}
+
+.key-cap--recording {
+  border-style: dashed;
+  opacity: 0.8;
+}

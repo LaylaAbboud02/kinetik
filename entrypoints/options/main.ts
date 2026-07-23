@@ -1,5 +1,16 @@
 import { getAllProfiles, saveProfile, deleteProfile } from '@/utils/storage';
 import { MAX_SPEED, MIN_SPEED, type SiteProfile } from '@/utils/types';
+import {
+  ACTIONS,
+  formatKeyCode,
+  findConflict,
+  isBindableKey,
+  getBindings,
+  saveBinding,
+  resetBindings,
+  type ActionId,
+  type Bindings,
+} from '@/utils/shortcuts';
 import './style.css';
 
 // The options page is an extension page with no associated tab, so unlike the
@@ -9,6 +20,12 @@ import './style.css';
 const tbody = document.querySelector<HTMLTableSectionElement>('#profiles-body')!;
 const table = document.querySelector<HTMLTableElement>('#profiles-table')!;
 const empty = document.querySelector<HTMLParagraphElement>('#profiles-empty')!;
+const shortcutsBody =
+  document.querySelector<HTMLTableSectionElement>('#shortcuts-body')!;
+const shortcutMessage =
+  document.querySelector<HTMLParagraphElement>('#shortcut-message')!;
+const resetShortcutsBtn =
+  document.querySelector<HTMLButtonElement>('#reset-shortcuts')!;
 
 /** Build one table row for a saved profile. */
 function renderRow(host: string, profile: SiteProfile): HTMLTableRowElement {
@@ -72,3 +89,119 @@ async function render(): Promise<void> {
 }
 
 void render();
+
+// --- Keyboard shortcuts ------------------------------------------------
+
+// Which action is currently waiting for a keypress, and how to stop waiting.
+let capturingAction: ActionId | null = null;
+let cancelCapture: (() => void) | null = null;
+
+function setMessage(text: string): void {
+  shortcutMessage.textContent = text;
+}
+
+/** Stop waiting for a keypress and restore the table. */
+function endCapture(): void {
+  cancelCapture?.();
+  cancelCapture = null;
+  capturingAction = null;
+  void renderShortcuts();
+}
+
+/**
+ * Wait for the next keypress and bind it to `actionId`.
+ *
+ * The listener is on `document` in the capture phase so it sees the key before
+ * anything else on the page, and it swallows the event so a stray keypress
+ * cannot also trigger browser find-as-you-type or similar.
+ */
+function beginCapture(actionId: ActionId, bindings: Bindings): void {
+  // Only one row can be recording at a time.
+  if (capturingAction) endCapture();
+  capturingAction = actionId;
+  setMessage('Press a key… (Escape to cancel)');
+  void renderShortcuts();
+
+  const onKeyDown = (e: KeyboardEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (e.code === 'Escape') {
+      setMessage('');
+      endCapture();
+      return;
+    }
+    if (!isBindableKey(e.code)) {
+      setMessage('Use a letter or a number.');
+      return; // stay in capture mode so the user can try again
+    }
+    const conflict = findConflict(bindings, e.code, actionId);
+    if (conflict) {
+      const label = ACTIONS.find((a) => a.id === conflict)?.label ?? conflict;
+      setMessage(`${formatKeyCode(e.code)} is already used by ${label}.`);
+      return;
+    }
+
+    void saveBinding(actionId, e.code).then(() => {
+      setMessage('');
+      endCapture();
+    });
+  };
+
+  document.addEventListener('keydown', onKeyDown, { capture: true });
+  cancelCapture = () =>
+    document.removeEventListener('keydown', onKeyDown, { capture: true });
+}
+
+/** Build one row: action label, its key, and a Change button. */
+function renderShortcutRow(
+  action: (typeof ACTIONS)[number],
+  bindings: Bindings,
+): HTMLTableRowElement {
+  const row = document.createElement('tr');
+
+  const labelCell = document.createElement('td');
+  labelCell.textContent = action.label;
+
+  const keyCell = document.createElement('td');
+  const cap = document.createElement('span');
+  const recording = capturingAction === action.id;
+  cap.className = recording ? 'key-cap key-cap--recording' : 'key-cap';
+  cap.textContent = recording ? '…' : formatKeyCode(bindings[action.id]);
+  keyCell.appendChild(cap);
+
+  const actionCell = document.createElement('td');
+  const change = document.createElement('button');
+  change.type = 'button';
+  change.className = 'delete-btn';
+  change.textContent = recording ? 'Cancel' : 'Change';
+  change.addEventListener('click', () => {
+    if (recording) {
+      setMessage('');
+      endCapture();
+    } else {
+      beginCapture(action.id, bindings);
+    }
+  });
+  actionCell.appendChild(change);
+
+  row.append(labelCell, keyCell, actionCell);
+  return row;
+}
+
+/** Load the bindings and rebuild the shortcuts table. */
+async function renderShortcuts(): Promise<void> {
+  const bindings = await getBindings();
+  shortcutsBody.replaceChildren();
+  for (const action of ACTIONS) {
+    shortcutsBody.appendChild(renderShortcutRow(action, bindings));
+  }
+}
+
+resetShortcutsBtn.addEventListener('click', async () => {
+  await resetBindings();
+  setMessage('Shortcuts reset to defaults.');
+  await renderShortcuts();
+});
+
+void renderShortcuts();
