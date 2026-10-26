@@ -1,11 +1,29 @@
-/* The popup has no fixed size by default — it shrinks to its content. We set a
-   comfortable width so the slider has room. */
+/* --- Tokens -------------------------------------------------------------
+   The accent is the indigo from the toolbar icon, so the popup reads as the
+   same product. Neutrals are translucent grey so one set of values works in
+   both light and dark mode (color-scheme follows the user's system). */
 :root {
   color-scheme: light dark;
+  --accent: #4f46e5;
+  --accent-hover: #4338ca;
+  --on-accent: #ffffff;
+  --border: rgba(127, 127, 127, 0.28);
+  --surface: rgba(127, 127, 127, 0.07);
+  --hover: rgba(127, 127, 127, 0.15);
+  --radius: 10px;
+  /* Native range sliders and checkboxes pick up the brand colour. */
+  accent-color: var(--accent);
 }
 
 * {
   box-sizing: border-box;
+}
+
+/* The `hidden` attribute is just `display: none` at the lowest priority, so
+   any class that sets `display: flex` silently un-hides the element. This
+   makes `hidden` always win — main.ts toggles it on whole sections. */
+[hidden] {
+  display: none !important;
 }
 
 body {
@@ -13,15 +31,23 @@ body {
   font-family: system-ui, -apple-system, sans-serif;
 }
 
+/* Chrome allows popups up to 800x600. 340px wide gives the sliders room;
+   the card layout keeps the full popup under the 600px height cap. */
 .popup {
-  /* Chrome allows popups up to 800px wide; 340px leaves the sliders and
-     button rows breathing room without feeling like a full page. */
   width: 340px;
-  padding: 16px;
+  padding: 12px;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 10px;
 }
+
+.popup__controls {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* --- Header ------------------------------------------------------------- */
 
 .popup__header {
   /* Positioning context for the shortcut help panel. */
@@ -35,6 +61,12 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.popup__title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
 }
 
 /* --- Shortcut help ("i" button + hover panel) --------------------------- */
@@ -68,7 +100,7 @@ body {
   right: 0;
   z-index: 10;
   padding: 10px 12px;
-  border: 1px solid rgba(127, 127, 127, 0.35);
+  border: 1px solid var(--border);
   border-radius: 8px;
   /* System colors follow the light/dark color-scheme automatically. */
   background: Canvas;
@@ -120,126 +152,268 @@ body {
   opacity: 0.65;
 }
 
-.popup__title {
+/* --- Cards -------------------------------------------------------------- */
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.card__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.card__inline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.card__title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.card__meta {
+  font-size: 12px;
+  opacity: 0.75;
+}
+
+.card__note {
   margin: 0;
-  font-size: 16px;
-  font-weight: 700;
+  font-size: 12px;
+  opacity: 0.75;
 }
 
-.popup__readout {
-  font-size: 22px;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
+.card__details {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
-.popup__slider {
+
+.card__divider {
   width: 100%;
+  margin: 2px 0;
+  border: none;
+  border-top: 1px solid var(--border);
 }
 
-.popup__row {
+.card__actions {
   display: flex;
   /* Space between side-by-side buttons (e.g. Update / Remove). */
   gap: 8px;
 }
 
-.popup__btn {
+.mono {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Reserved for step 7 (licensing): markup is in place but hidden until then,
+   so gating needs no layout changes. */
+.pro {
+  padding: 2px 5px;
+  border-radius: 4px;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+
+
+/* --- Speed -------------------------------------------------------------- */
+
+.speed__readout {
+  font-size: 34px;
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.slider {
+  width: 100%;
+  margin: 0;
+}
+
+.presets {
+  display: flex;
+  gap: 6px;
+}
+
+.chip {
   flex: 1;
-  padding: 8px 12px;
-  font-size: 13px;
-  font-weight: 600;
-  border: 1px solid currentColor;
-  border-radius: 6px;
+  padding: 6px 0;
+  border: 1px solid var(--border);
+  border-radius: 999px;
   background: transparent;
   color: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
   cursor: pointer;
 }
 
-.popup__btn:hover {
-  background: rgba(127, 127, 127, 0.15);
+.chip:hover {
+  background: var(--hover);
 }
 
-.popup__status {
-  margin: 0;
-  min-height: 1em;
-  font-size: 12px;
-  opacity: 0.7;
+.chip.is-active {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--on-accent);
 }
 
-.popup__divider {
-  border: none;
-  border-top: 1px solid rgba(127, 127, 127, 0.3);
-  margin: 2px 0;
-  width: 100%;
-}
+/* --- Buttons ------------------------------------------------------------ */
 
-.popup__row--between {
-  justify-content: space-between;
-  align-items: center;
-}
-
-.popup__label {
+.btn {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
   font-size: 13px;
   font-weight: 600;
+  cursor: pointer;
 }
 
-.popup__label--small {
+.btn:hover {
+  background: var(--hover);
+}
+
+.btn--primary {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.btn--primary:hover {
+  border-color: var(--accent-hover);
+  background: var(--accent-hover);
+}
+
+/* Secondary actions sized to content, e.g. Remove next to Update. */
+.btn--compact {
+  flex: none;
+}
+
+.btn--small {
+  flex: none;
+  padding: 3px 10px;
   font-size: 12px;
-  font-weight: 400;
-  opacity: 0.8;
 }
 
-.popup__mono {
-  font-size: 12px;
-  font-variant-numeric: tabular-nums;
-  opacity: 0.9;
+
+.btn:focus-visible,
+.chip:focus-visible,
+.popup__link:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
-/* Live level meter. The fill shows current audio; the marker shows where the
-   silence threshold sits, so anything left of it counts as silence. */
-.popup__meter {
+/* --- Toggle switch (a styled checkbox, role="switch") ------------------- */
+
+.switch {
+  appearance: none;
   position: relative;
-  height: 8px;
-  width: 100%;
-  background: rgba(127, 127, 127, 0.25);
-  border-radius: 4px;
-  overflow: hidden;
+  flex-shrink: 0;
+  width: 34px;
+  height: 20px;
+  margin: 0;
+  border-radius: 999px;
+  background: rgba(127, 127, 127, 0.4);
+  cursor: pointer;
+  transition: background 0.15s;
 }
 
-.popup__meter-fill {
-  height: 100%;
+.switch::before {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  transition: transform 0.15s;
+}
+
+.switch:checked {
+  background: var(--accent);
+}
+
+.switch:checked::before {
+  transform: translateX(14px);
+}
+
+.switch:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* --- Live level meter ---------------------------------------------------
+   The fill shows current audio; the marker shows where the silence
+   threshold sits, so anything left of it counts as silence. */
+
+.meter {
+  position: relative;
+  width: 100%;
+  height: 8px;
+  overflow: hidden;
+  border-radius: 4px;
+  background: rgba(127, 127, 127, 0.25);
+}
+
+.meter__fill {
   width: 0%;
-  background: currentColor;
-  opacity: 0.55;
+  height: 100%;
+  background: var(--accent);
   transition: width 0.1s linear;
 }
 
-.popup__meter-marker {
+.meter__marker {
   position: absolute;
   top: 0;
   bottom: 0;
+  left: 0;
   width: 2px;
   background: #ef4444;
-  left: 0;
 }
 
-.popup__notes {
+/* --- Notes -------------------------------------------------------------- */
+
+.notes {
   list-style: none;
   margin: 0;
   padding: 0;
-  max-height: 160px;
+  /* ~4 notes, then scroll — keeps the worst case under the 600px cap. */
+  max-height: 100px;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
 }
 
-.popup__note {
+.note {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
 }
 
-.popup__note-jump {
+.note__jump {
   flex: 1;
   min-width: 0;
   display: flex;
@@ -255,53 +429,78 @@ body {
   cursor: pointer;
 }
 
-.popup__note-jump:hover {
-  background: rgba(127, 127, 127, 0.15);
+.note__jump:hover {
+  background: var(--hover);
 }
 
-.popup__note-time {
+.note__time {
+  flex-shrink: 0;
   font-variant-numeric: tabular-nums;
   opacity: 0.7;
-  flex-shrink: 0;
 }
 
-.popup__note-text {
+.note__text {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.popup__note-delete {
+.note__delete {
   flex-shrink: 0;
+  padding: 2px 4px;
   border: none;
   background: transparent;
   color: inherit;
-  opacity: 0.5;
-  cursor: pointer;
   font-size: 14px;
   line-height: 1;
-  padding: 2px 4px;
+  opacity: 0.5;
+  cursor: pointer;
 }
 
-.popup__note-delete:hover {
+.note__delete:hover {
   opacity: 1;
 }
 
-.popup__notes-empty {
+.notes__empty {
   font-size: 12px;
   opacity: 0.6;
 }
 
+/* --- Empty state (no video on the page) --------------------------------- */
+
+.empty {
+  padding: 20px 12px;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+  text-align: center;
+}
+
+
+.empty__title {
+  margin: 0 0 6px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.empty__body {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.45;
+  opacity: 0.7;
+}
+
+/* --- Footer ------------------------------------------------------------- */
+
 .popup__link {
+  align-self: flex-start;
+  padding: 0;
   border: none;
   background: transparent;
   color: inherit;
-  opacity: 0.7;
   font-size: 12px;
   text-decoration: underline;
+  opacity: 0.7;
   cursor: pointer;
-  padding: 0;
-  text-align: left;
 }
 
 .popup__link:hover {

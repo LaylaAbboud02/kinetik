@@ -32,94 +32,128 @@
             </div>
           </div>
         </div>
-        <span id="speed-readout" class="popup__readout">1×</span>
       </header>
 
-      <input
-        id="speed-slider"
-        class="popup__slider"
-        type="range"
-        min="0.25"
-        max="16"
-        step="0.1"
-        value="1"
-        aria-label="Playback speed"
-      />
+      <!-- Shown instead of the controls when no frame in the tab has a video. -->
+      <section id="empty-state" class="empty" hidden>
+        <p class="empty__title">No video on this page</p>
+        <p class="empty__body">
+          Kinetik works on any page with a video. If one is playing, refresh
+          the page — tabs opened before Kinetik was installed or updated can't
+          be reached until they reload.
+        </p>
+      </section>
 
-      <div class="popup__row">
-        <button id="reset-btn" class="popup__btn" type="button">Reset to 1×</button>
+      <div id="controls" class="popup__controls">
+        <!-- Speed: the main job of the popup, so it gets the biggest type. -->
+        <section class="card">
+          <span id="speed-readout" class="speed__readout">1×</span>
+          <input
+            id="speed-slider"
+            class="slider"
+            type="range"
+            min="0.25"
+            max="16"
+            step="0.1"
+            value="1"
+            aria-label="Playback speed"
+          />
+          <!-- The slider spans 0.25–16x, which crams the useful 1–3x range
+               into its first sliver; presets make the common speeds one tap. -->
+          <div class="presets" role="group" aria-label="Speed presets">
+            <button class="chip" type="button" data-speed="1">1×</button>
+            <button class="chip" type="button" data-speed="1.25">1.25×</button>
+            <button class="chip" type="button" data-speed="1.5">1.5×</button>
+            <button class="chip" type="button" data-speed="1.75">1.75×</button>
+            <button class="chip" type="button" data-speed="2">2×</button>
+            <button class="chip" type="button" data-speed="2.5">2.5×</button>
+            <button class="chip" type="button" data-speed="3">3×</button>
+          </div>
+
+          <hr class="card__divider" />
+
+          <div class="card__row">
+            <span class="card__title">
+              This site <span class="pro" hidden>PRO</span>
+            </span>
+            <span id="profile-readout" class="card__meta">Not saved</span>
+          </div>
+          <div class="card__actions">
+            <button id="save-profile-btn" class="btn btn--primary" type="button">
+              Save for this site
+            </button>
+            <button id="remove-profile-btn" class="btn btn--compact" type="button" hidden>
+              Remove
+            </button>
+          </div>
+        </section>
+
+        <section class="card">
+          <div class="card__row">
+            <label class="card__title" for="skip-silence-toggle">
+              Skip silence <span class="pro" hidden>PRO</span>
+            </label>
+            <input
+              id="skip-silence-toggle"
+              class="switch"
+              type="checkbox"
+              role="switch"
+            />
+          </div>
+          <p id="skip-silence-note" class="card__note" hidden></p>
+
+          <!-- Tuning controls only matter while skip silence is on. -->
+          <div id="skip-details" class="card__details" hidden>
+            <!-- Threshold and live level share one row: compare the two numbers
+                 directly, and keep the popup under Chrome's 600px height cap. -->
+            <div class="card__row">
+              <label class="card__meta" for="threshold-slider">
+                Sensitivity <span id="threshold-readout" class="mono">0.020</span>
+              </label>
+              <span class="card__meta">
+                Level <span id="level-readout" class="mono">—</span>
+              </span>
+            </div>
+            <input
+              id="threshold-slider"
+              class="slider"
+              type="range"
+              min="0.001"
+              max="0.1"
+              step="0.001"
+              value="0.02"
+              aria-label="Silence sensitivity"
+            />
+            <!-- Live audio level vs. the threshold, so the slider can be tuned
+                 by eye: anything left of the marker counts as silence. -->
+            <div class="meter" title="Live audio level">
+              <div id="level-fill" class="meter__fill"></div>
+              <div id="level-marker" class="meter__marker"></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="card">
+          <div class="card__row">
+            <span class="card__title">
+              A-B loop <span class="pro" hidden>PRO</span>
+            </span>
+            <div class="card__inline">
+              <span id="loop-readout" class="card__meta">Press L to start</span>
+              <button id="clear-loop-btn" class="btn btn--small" type="button" hidden>
+                Clear
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <section class="card">
+          <span class="card__title">
+            Notes <span class="pro" hidden>PRO</span>
+          </span>
+          <ul id="notes-list" class="notes"></ul>
+        </section>
       </div>
-
-      <hr class="popup__divider" />
-
-      <div class="popup__row popup__row--between">
-        <span class="popup__label">This site</span>
-        <span id="profile-readout" class="popup__mono">Not saved</span>
-      </div>
-      <div class="popup__row">
-        <button id="save-profile-btn" class="popup__btn" type="button">
-          Save for this site
-        </button>
-        <button id="remove-profile-btn" class="popup__btn" type="button" hidden>
-          Remove
-        </button>
-      </div>
-
-      <hr class="popup__divider" />
-
-      <div class="popup__row popup__row--between">
-        <label class="popup__label" for="skip-silence-toggle">Skip silence</label>
-        <input id="skip-silence-toggle" type="checkbox" />
-      </div>
-
-      <div class="popup__row popup__row--between">
-        <label class="popup__label popup__label--small" for="threshold-slider">
-          Sensitivity
-        </label>
-        <span id="threshold-readout" class="popup__mono">0.020</span>
-      </div>
-      <input
-        id="threshold-slider"
-        class="popup__slider"
-        type="range"
-        min="0.001"
-        max="0.1"
-        step="0.001"
-        value="0.02"
-        aria-label="Silence sensitivity"
-      />
-
-      <!-- Live audio level vs. the threshold, so the slider can be tuned by
-           eye: anything left of the marker counts as silence. -->
-      <div class="popup__meter" title="Live audio level">
-        <div id="level-fill" class="popup__meter-fill"></div>
-        <div id="level-marker" class="popup__meter-marker"></div>
-      </div>
-      <div class="popup__row popup__row--between">
-        <span class="popup__label--small">Level</span>
-        <span id="level-readout" class="popup__mono">—</span>
-      </div>
-
-      <p id="skip-silence-note" class="popup__status"></p>
-
-      <hr class="popup__divider" />
-
-      <div class="popup__row popup__row--between">
-        <span class="popup__label">Loop</span>
-        <span id="loop-readout" class="popup__mono">No loop set</span>
-      </div>
-      <div class="popup__row">
-        <button id="clear-loop-btn" class="popup__btn" type="button" disabled>
-          Clear loop
-        </button>
-      </div>
-
-      <hr class="popup__divider" />
-
-      <span class="popup__label">Notes</span>
-      <ul id="notes-list" class="popup__notes"></ul>
-
-      <p id="status" class="popup__status"></p>
 
       <button id="open-options-btn" class="popup__link" type="button">
         Settings — profiles &amp; shortcuts
