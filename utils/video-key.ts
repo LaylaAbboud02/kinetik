@@ -27,6 +27,19 @@ export function deriveVideoKey(url: string): string {
     if (match) return `vimeo:${match[1]}`;
   }
 
+  // Microsoft Learn plays videos in an embedded player (an iframe) whose path
+  // is identical for every video — the video is identified ONLY by its `id`
+  // param, so the query-dropping fallback below would merge every video's
+  // notes into one. The iframe starts on learn-video.azurefd.net and redirects
+  // to a learn.microsoft.com video-embed page; handle both.
+  const isMsLearnPlayer =
+    host === 'learn-video.azurefd.net' ||
+    (host === 'learn.microsoft.com' && parsed.pathname.includes('/video-embed'));
+  if (isMsLearnPlayer) {
+    const videoId = parsed.searchParams.get('id');
+    if (videoId) return `mslearn:${videoId}`;
+  }
+
   // Fallback: host + path, deliberately WITHOUT search or hash, so the same
   // lecture reached with ?start=360#overview matches the plain URL.
   return `${host}${parsed.pathname}`;

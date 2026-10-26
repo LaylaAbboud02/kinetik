@@ -46,6 +46,12 @@ import {
 // since "any site with HTML5 video" could be anywhere.
 export default defineContentScript({
   matches: ['*://*/*'],
+  // Run inside iframes too. Some sites (e.g. Microsoft Learn) play video in an
+  // embedded player iframe, whose document the top-frame script can't see.
+  // Consequence: one instance of this script runs per frame, so frames without
+  // a video must stay out of the way — see the `!video` guards on keyboard
+  // handling and on message replies below.
+  allFrames: true,
   main() {
     // --- In-memory state -------------------------------------------------
     // userSpeed lives only for this page load. Free tier intentionally does
@@ -393,6 +399,10 @@ export default defineContentScript({
     }
 
     function onKeyDown(e: KeyboardEvent): void {
+      // No video in this frame: leave every key to the page. With allFrames,
+      // this script also runs in ad/chat/embed iframes, which must not swallow
+      // shortcuts or flash a speed badge for a video they don't have.
+      if (!video) return;
       if (shouldIgnoreKey(e)) return;
       // e.code is the physical key ("KeyS"), independent of shift/caps lock.
       const action = resolveAction(bindings, e.code);
@@ -415,7 +425,17 @@ export default defineContentScript({
     // The popup sends SET_SPEED when the slider moves, and GET_SPEED when it
     // opens (to display the current speed). Returning a value from an async
     // listener sends it back as the response.
-    browser.runtime.onMessage.addListener(async (message: Message) => {
+    // A popup message goes to EVERY frame in the tab, and the first frame to
+    // answer wins. So only a frame that owns a video may answer: returning
+    // plain `undefined` (not a promise) declines, letting the video's frame
+    // respond. Without this, an ad iframe could answer GET_SPEED with "1x, no
+    // video" and the popup would show the wrong state.
+    browser.runtime.onMessage.addListener((message: Message) => {
+      if (!video) return undefined;
+      return handleMessage(message);
+    });
+
+    async function handleMessage(message: Message) {
       switch (message.type) {
         case 'SET_SPEED':
           setUserSpeed(message.speed);
@@ -495,6 +515,6 @@ export default defineContentScript({
           await deleteProfile(getHostKey());
           return;
       }
-    });
+    }
   },
 });

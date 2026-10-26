@@ -43,6 +43,26 @@ describe('deriveVideoKey', () => {
     );
   });
 
+  it('uses the id param for the Microsoft Learn embedded player', () => {
+    const embed =
+      'https://learn.microsoft.com/_themes/docs.theme/master/en-us/_themes/global/video-embed-one-stream.html?id=ea041e4b-a1ed&locale=en-gb';
+    expect(deriveVideoKey(embed)).toBe('mslearn:ea041e4b-a1ed');
+  });
+
+  it('gives different Microsoft Learn videos different keys', () => {
+    const base =
+      'https://learn.microsoft.com/_themes/docs.theme/master/en-us/_themes/global/video-embed-one-stream.html';
+    expect(deriveVideoKey(`${base}?id=aaa`)).not.toBe(
+      deriveVideoKey(`${base}?id=bbb`),
+    );
+  });
+
+  it('handles the Microsoft Learn player before its redirect', () => {
+    expect(
+      deriveVideoKey('https://learn-video.azurefd.net/vod/player?id=ea041e4b-a1ed'),
+    ).toBe('mslearn:ea041e4b-a1ed');
+  });
+
   it('returns the input unchanged when the URL is malformed', () => {
     expect(deriveVideoKey('not a url')).toBe('not a url');
   });
