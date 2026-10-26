@@ -9,7 +9,29 @@
   <body>
     <main class="popup">
       <header class="popup__header">
-        <h1 class="popup__title">Kinetik</h1>
+        <div class="popup__title-group">
+          <h1 class="popup__title">Kinetik</h1>
+          <!-- Hover or focus (click/Tab) reveals the shortcut cheat sheet. The
+               list is filled from the user's saved bindings in main.ts. -->
+          <div class="popup__help">
+            <button
+              class="popup__help-btn"
+              type="button"
+              aria-label="Keyboard shortcuts"
+              aria-describedby="shortcut-help"
+            >
+              i
+            </button>
+            <div id="shortcut-help" class="popup__help-panel" role="tooltip">
+              <p class="popup__help-title">Keyboard shortcuts</p>
+              <ul id="shortcut-list" class="popup__help-list"></ul>
+              <p class="popup__help-note">
+                Click the video first so the keys reach it. Change them in
+                Settings below.
+              </p>
+            </div>
+          </div>
+        </div>
         <span id="speed-readout" class="popup__readout">1×</span>
       </header>
 
@@ -100,7 +122,7 @@
       <p id="status" class="popup__status"></p>
 
       <button id="open-options-btn" class="popup__link" type="button">
-        Manage all profiles
+        Settings — profiles &amp; shortcuts
       </button>
     </main>
 

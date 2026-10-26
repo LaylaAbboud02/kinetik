@@ -11,6 +11,13 @@ import {
 } from '@/utils/types';
 import { browser } from 'wxt/browser';
 import { formatTime } from '@/utils/loop';
+import {
+  ACTIONS,
+  DEFAULT_BINDINGS,
+  formatKeyCode,
+  getBindings,
+  type Bindings,
+} from '@/utils/shortcuts';
 import './style.css';
 
 // The popup is a tiny web page that opens when you click the toolbar icon. It
@@ -352,5 +359,33 @@ setInterval(async () => {
   );
   if (state) reflectLevel(state.amplitude, state.enabled);
 }, 150);
+
+// --- Shortcut cheat sheet ----------------------------------------------
+
+const shortcutList =
+  document.querySelector<HTMLUListElement>('#shortcut-list')!;
+
+/** Fill the help panel with each action and the key it's currently bound to. */
+function reflectShortcuts(bindings: Bindings): void {
+  shortcutList.replaceChildren(
+    ...ACTIONS.map((action) => {
+      const item = document.createElement('li');
+      const key = document.createElement('kbd');
+      key.textContent = formatKeyCode(bindings[action.id]);
+      const label = document.createElement('span');
+      label.textContent = action.label;
+      item.append(key, label);
+      return item;
+    }),
+  );
+}
+
+// Render the defaults immediately so the panel is never empty, then swap in
+// the user's remapped keys once storage answers. If that read fails, the
+// defaults stay — still useful, and not worth an error in the popup.
+reflectShortcuts(DEFAULT_BINDINGS);
+void getBindings()
+  .then(reflectShortcuts)
+  .catch(() => {});
 
 void init();

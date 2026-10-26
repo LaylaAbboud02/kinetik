@@ -14,7 +14,9 @@ body {
 }
 
 .popup {
-  width: 280px;
+  /* Chrome allows popups up to 800px wide; 340px leaves the sliders and
+     button rows breathing room without feeling like a full page. */
+  width: 340px;
   padding: 16px;
   display: flex;
   flex-direction: column;
@@ -22,9 +24,100 @@ body {
 }
 
 .popup__header {
+  /* Positioning context for the shortcut help panel. */
+  position: relative;
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
+}
+
+.popup__title-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* --- Shortcut help ("i" button + hover panel) --------------------------- */
+
+.popup__help-btn {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  background: transparent;
+  color: inherit;
+  font: italic 600 11px/1 Georgia, serif;
+  opacity: 0.55;
+  cursor: help;
+}
+
+.popup__help-btn:hover,
+.popup__help-btn:focus-visible {
+  opacity: 1;
+}
+
+.popup__help-panel {
+  display: none;
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  z-index: 10;
+  padding: 10px 12px;
+  border: 1px solid rgba(127, 127, 127, 0.35);
+  border-radius: 8px;
+  /* System colors follow the light/dark color-scheme automatically. */
+  background: Canvas;
+  color: CanvasText;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+}
+
+/* :focus-within keeps it usable by keyboard and on click, not just hover. */
+.popup__help:hover .popup__help-panel,
+.popup__help:focus-within .popup__help-panel {
+  display: block;
+}
+
+.popup__help-title {
+  margin: 0 0 8px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.popup__help-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 12px;
+}
+
+.popup__help-list li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.popup__help-list kbd {
+  min-width: 22px;
+  padding: 2px 6px;
+  border: 1px solid rgba(127, 127, 127, 0.5);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  font: 600 11px/1.2 ui-monospace, monospace;
+  text-align: center;
+}
+
+.popup__help-note {
+  margin: 8px 0 0;
+  font-size: 11px;
+  opacity: 0.65;
 }
 
 .popup__title {
@@ -45,6 +138,8 @@ body {
 
 .popup__row {
   display: flex;
+  /* Space between side-by-side buttons (e.g. Update / Remove). */
+  gap: 8px;
 }
 
 .popup__btn {
